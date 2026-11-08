@@ -1,0 +1,72 @@
+# Usage:
+#   SQLite (default):          docker compose up -d --build
+#   Bundled PostgreSQL:        COMPOSE_PROFILES=postgres  (set in .env) + DB_TYPE=postgresql + DB_HOST=postgres
+#   Bundled MariaDB:           COMPOSE_PROFILES=mariadb   (set in .env) + DB_TYPE=mariadb    + DB_HOST=mariadb
+#   External database:         DB_TYPE=postgresql|mariadb, DB_HOST=<address>, COMPOSE_PROFILES empty
+name: logwatch-ai
+
+services:
+  logwatch:
+    build: .
+    image: logwatch-ai:latest
+    container_name: logwatch-ai
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      TZ: ${TZ:-Europe/Warsaw}
+    volumes:
+      - logwatch_data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+      mariadb:
+        condition: service_healthy
+        required: false
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  postgres:
+    image: postgres:16-alpine
+    profiles: ["postgres"]
+    container_name: logwatch-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-logwatch}
+      POSTGRES_USER: ${DB_USER:-logwatch}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-}
+      TZ: ${TZ:-Europe/Warsaw}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  mariadb:
+    image: mariadb:11
+    profiles: ["mariadb"]
+    container_name: logwatch-mariadb
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${DB_NAME:-logwatch}
+      MARIADB_USER: ${DB_USER:-logwatch}
+      MARIADB_PASSWORD: ${DB_PASSWORD:-}
+      MARIADB_RANDOM_ROOT_PASSWORD: "1"
+      TZ: ${TZ:-Europe/Warsaw}
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  logwatch_data:
+  postgres_data:
+  mariadb_data:

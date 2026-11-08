@@ -1,0 +1,9 @@
+.env
+.env.*
+.git
+.backup
+.logwatch-setup
+setup.sh
+__pycache__
+*.pyc
+data
